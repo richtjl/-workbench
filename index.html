@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+<!-- iOS PWA 支持 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="自律工作台">
+<meta name="format-detection" content="telephone=no">
+
+<!-- 主题色 -->
+<meta name="theme-color" content="#FDF6EC">
+<title>自律工作台</title>
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- 图标（iOS 必须用 PNG，不能用 SVG） -->
+<link rel="apple-touch-icon" href="apple-touch-icon-180.png">
+<link rel="apple-touch-icon" sizes="167x167" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
+<!-- iOS 启动画面颜色 -->
+<link rel="apple-touch-startup-image" href="icon-512.png">
+<script src="chart.umd.min.js?v=11"></script>
+<link rel="stylesheet" href="style.css?v=11">
+</head>
+<body>
+<div id="app" class="app-layout">
+
+  <!-- ========== 左侧 Sidebar ========== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="connection-status" id="connection-status">
+        <span class="cs-dot"></span>
+        <span class="cs-text">本地</span>
+      </div>
+      <button class="sidebar-toggle" onclick="Sidebar.toggle()" title="折叠侧边栏">≡</button>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div class="sidebar-footer">
+      <button class="sidebar-foot-btn" onclick="Companion.openSettings()" title="切换互动人物">🌸 角色</button>
+      <button class="sidebar-foot-btn" onclick="App.openSettings()" title="设置">⚙️ 设置</button>
+    </div>
+  </aside>
+
+  <!-- ========== 移动端遮罩 ========== -->
+  <div class="sidebar-mask hidden" id="sidebar-mask" onclick="Sidebar.closeMobile()"></div>
+
+  <!-- ========== 右侧主操作区 ========== -->
+  <main class="main-area">
+    <header class="top-bar">
+      <button class="mobile-menu-btn" onclick="Sidebar.openMobile()" title="菜单">≡</button>
+      <h1 class="top-bar-title" id="top-bar-title">⏳ 专注</h1>
+      <div class="top-bar-coins" id="top-bar-coins" title="纪念币">🪙 0</div>
+    </header>
+
+    <div class="page-views">
+
+      <!-- ========== 番茄钟 ========== -->
+      <section class="page-view active" id="view-timer">
+        <div class="card">
+          <div class="mode-tabs">
+            <button class="mode-tab active" data-mode="countdown" onclick="Timer.setMode('countdown')">倒计时</button>
+            <button class="mode-tab" data-mode="stopwatch" onclick="Timer.setMode('stopwatch')">正计时</button>
+          </div>
+          <div class="duration-settings" id="duration-settings">
+            <div class="duration-presets">
+              <button class="preset-btn" data-min="15" onclick="Timer.setDuration(15)">15分</button>
+              <button class="preset-btn active" data-min="25" onclick="Timer.setDuration(25)">25分</button>
+              <button class="preset-btn" data-min="45" onclick="Timer.setDuration(45)">45分</button>
+              <button class="preset-btn" data-min="60" onclick="Timer.setDuration(60)">60分</button>
+            </div>
+            <div class="duration-custom">
+              <input type="number" id="custom-minutes" min="1" max="180" value="25" placeholder="自定义分钟">
+              <button class="btn btn-secondary btn-sm" onclick="Timer.setCustomDuration()">设置</button>
+            </div>
+          </div>
+          <div class="timer-display-wrapper">
+            <svg class="timer-ring" width="260" height="260" viewBox="0 0 260 260">
+              <circle class="timer-ring-bg" cx="130" cy="130" r="120"/>
+              <circle class="timer-ring-progress" cx="130" cy="130" r="120" id="timer-ring-progress"/>
+            </svg>
+            <div class="timer-center">
+              <div class="timer-time" id="timer-display">25:00</div>
+              <div class="timer-status" id="timer-status">准备专注</div>
+            </div>
+          </div>
+          <div class="timer-controls">
+            <button class="btn btn-primary btn-lg" id="timer-start-btn" onclick="Timer.start()">▶ 开始专注</button>
+            <button class="btn btn-success btn-lg hidden" id="timer-complete-btn" onclick="Timer.complete()">✓ 完成</button>
+            <button class="btn btn-danger btn-lg hidden" id="timer-stop-btn" onclick="Timer.stop()">⏹ 停止</button>
+          </div>
+        </div>
+        <div class="card" id="timer-history-card">
+          <div class="card-title">📋 专注历史</div>
+          <div id="timer-history-list" class="foldable-container"></div>
+        </div>
+      </section>
+
+      <!-- ========== 要干啦（任务与目标） ========== -->
+      <section class="page-view" id="view-tasks">
+        <div class="card">
+          <div class="card-title">✅ 今日待办 <span class="date-display" id="tasks-date-display"></span></div>
+          <div class="date-bar" id="tasks-date-bar"></div>
+          <div class="task-add-row">
+            <input type="text" id="task-input" placeholder="添加一个任务..." onkeypress="if(event.key==='Enter')Tasks.addTask()">
+            <button class="btn btn-primary btn-sm" onclick="Tasks.addTask()">+</button>
+          </div>
+          <div id="task-list" class="task-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 日历视图</div>
+          <div class="calendar-nav">
+            <button class="cal-nav-btn" onclick="Tasks.prevMonth()">‹</button>
+            <span id="tasks-cal-title">2026年8月</span>
+            <button class="cal-nav-btn" onclick="Tasks.nextMonth()">›</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div class="calendar-grid" id="tasks-calendar-grid"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🎯 目标拆解</div>
+          <div class="goal-add-row">
+            <input type="text" id="goal-name-input" placeholder="大目标名称">
+            <input type="date" id="goal-deadline-input">
+            <button class="btn btn-primary btn-sm" onclick="Tasks.addGoal()">添加</button>
+          </div>
+          <div id="goal-list"></div>
+        </div>
+      </section>
+
+      <!-- ========== 打卡好习惯 ========== -->
+      <section class="page-view" id="view-habits">
+        <div class="card">
+          <div class="card-title">🌿 我的习惯 <span class="grace-card-badge" id="grace-badge" onclick="Habits.showGraceInfo()">🎟️ <span id="grace-count">1</span></span></div>
+          <div class="task-add-row">
+            <input type="text" id="habit-input" placeholder="新建一个习惯..." onkeypress="if(event.key==='Enter')Habits.addHabit()">
+            <button class="btn btn-primary btn-sm" onclick="Habits.addHabit()">+</button>
+          </div>
+          <div id="habit-list"></div>
+          <div class="task-empty hidden" id="habit-empty">种下第一个习惯的种子吧 🌱</div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏷️ 标签管理</div>
+          <div class="tag-add-row">
+            <input type="text" id="tag-input" placeholder="新标签名（如：学习、运动）" onkeypress="if(event.key==='Enter')Tags.addTag()">
+            <button class="btn btn-secondary btn-sm" onclick="Tags.addTag()">添加</button>
+          </div>
+          <div id="tag-list" class="tag-list"></div>
+        </div>
+      </section>
+
+      <!-- ========== 记账 ========== -->
+      <section class="page-view" id="view-finance">
+        <div class="card card-warm finance-overview">
+          <div class="finance-balance">
+            <div class="finance-balance-label">净资产</div>
+            <div class="finance-balance-value" id="finance-net-assets">¥0.00</div>
+          </div>
+          <div class="finance-sub-row">
+            <div class="finance-sub-item">
+              <span class="finance-sub-label">本月收入</span>
+              <span class="finance-sub-value income" id="finance-month-income">+¥0.00</span>
+            </div>
+            <div class="finance-sub-item">
+              <span class="finance-sub-label">本月支出</span>
+              <span class="finance-sub-value expense" id="finance-month-expense">-¥0.00</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="finance-type-tabs">
+            <button class="ftype-tab active" data-type="expense" onclick="Finance.setType('expense')">支出</button>
+            <button class="ftype-tab" data-type="income" onclick="Finance.setType('income')">收入</button>
+            <button class="ftype-tab" data-type="transfer" onclick="Finance.setType('transfer')">转账</button>
+          </div>
+          <div class="finance-amount-row">
+            <span class="currency">¥</span>
+            <input type="number" id="finance-amount" placeholder="0.00" step="0.01">
+          </div>
+          <div class="finance-category-grid" id="finance-category-grid"></div>
+          <div class="finance-detail-row">
+            <select id="finance-account-from"></select>
+            <select id="finance-account-to" class="hidden"></select>
+            <input type="date" id="finance-date">
+            <input type="text" id="finance-note" placeholder="备注">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="Finance.addRecord()">记一笔</button>
+        </div>
+        <div class="card">
+          <div class="finance-month-nav">
+            <button class="cal-nav-btn" onclick="Finance.prevMonth()">‹</button>
+            <span id="finance-month-title">2026年8月</span>
+            <button class="cal-nav-btn" onclick="Finance.nextMonth()">›</button>
+          </div>
+          <div class="finance-summary-row">
+            <div class="fs-item"><div class="fs-label">收入</div><div class="fs-value income" id="fs-income">¥0.00</div></div>
+            <div class="fs-item"><div class="fs-label">支出</div><div class="fs-value expense" id="fs-expense">¥0.00</div></div>
+            <div class="fs-item"><div class="fs-label">结余</div><div class="fs-value" id="fs-balance">¥0.00</div></div>
+          </div>
+          <div class="chart-wrap chart-wrap-tall"><canvas id="chart-finance-pie"></canvas></div>
+          <div id="finance-category-breakdown"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 近6月收支趋势</div>
+          <div class="chart-wrap"><canvas id="chart-finance-line"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏦 账户管理</div>
+          <div class="account-add-row">
+            <input type="text" id="account-name-input" placeholder="账户名称">
+            <input type="number" id="account-balance-input" placeholder="初始余额" step="0.01">
+            <button class="btn btn-primary btn-sm" onclick="Finance.addAccount()">+</button>
+          </div>
+          <div id="account-list"></div>
+        </div>
+      </section>
+
+      <!-- ========== 心情日历 ========== -->
+      <section class="page-view" id="view-mood">
+        <div class="card">
+          <div class="card-title">🌈 告诉葵你今天心情如何</div>
+          <div class="mood-tip">点击任意日期，记录今天的心情和故事 🌸</div>
+          <div class="mood-calendar-nav">
+            <button class="cal-nav-btn" onclick="Mood.prevMonth()">‹</button>
+            <span id="mood-cal-title">2026年8月</span>
+            <button class="cal-nav-btn" onclick="Mood.nextMonth()">›</button>
+          </div>
+          <div class="calendar-weekdays">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div class="calendar-grid" id="mood-calendar-grid"></div>
+        </div>
+        <div class="card" id="mood-recent-card">
+          <div class="card-title">📖 心情故事</div>
+          <div class="task-empty">还没有记录心情哦，点击日历开始吧 🌸</div>
+        </div>
+      </section>
+
+      <!-- ========== 纪念币 ========== -->
+      <section class="page-view" id="view-coins">
+        <div class="card card-warm" style="text-align:center">
+          <div style="font-size:48px">🪙</div>
+          <div class="coins-balance" id="coins-big-balance">0</div>
+          <div style="color:var(--text-secondary);font-size:14px;margin-bottom:16px">你的纪念币总数</div>
+          <button class="btn btn-secondary" onclick="Coins.showHistory()">查看获得/消耗记录</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📜 纪念币规则</div>
+          <ul style="line-height:2;color:var(--text-secondary);font-size:14px;padding-left:20px">
+            <li>🌱 完成一次番茄专注：奖励 <b style="color:var(--accent-orange-dark)">+3</b> 币</li>
+            <li>⏹ 中途手动停止：扣除 <b style="color:var(--accent-pink)">-2</b> 币</li>
+            <li>🪙 纪念币可在设置中调整奖励/扣除数额</li>
+            <li>📉 纪念币最低为 0，不会透支</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ========== 数据复盘 ========== -->
+      <section class="page-view" id="view-stats">
+        <div class="stats-overview">
+          <div class="stat-mini-card">
+            <div class="stat-mini-icon">⏳</div>
+            <div class="stat-mini-value" id="stat-total-focus">0h</div>
+            <div class="stat-mini-label">总专注时长</div>
+          </div>
+          <div class="stat-mini-card">
+            <div class="stat-mini-icon">📅</div>
+            <div class="stat-mini-value" id="stat-active-days">0</div>
+            <div class="stat-mini-label">活跃天数</div>
+          </div>
+          <div class="stat-mini-card">
+            <div class="stat-mini-icon">🔥</div>
+            <div class="stat-mini-value" id="stat-best-streak">0</div>
+            <div class="stat-mini-label">最长连续</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔥 活跃度热力图</div>
+          <div id="heatmap-wrapper"></div>
+          <div class="heatmap-legend">
+            <span>少</span>
+            <div class="heatmap-legend-cells">
+              <div class="heat-cell" style="background:var(--bg-input)"></div>
+              <div class="heat-cell" style="background:rgba(232,168,124,0.4)"></div>
+              <div class="heat-cell" style="background:rgba(232,168,124,0.6)"></div>
+              <div class="heat-cell" style="background:var(--accent-orange)"></div>
+              <div class="heat-cell" style="background:var(--accent-orange-dark)"></div>
+            </div>
+            <span>多</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📈 近7天专注时长</div>
+          <div class="chart-wrap"><canvas id="chart-focus-bar"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🥧 专注模式占比</div>
+          <div class="chart-wrap chart-wrap-tall"><canvas id="chart-focus-pie"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📉 近7日任务完成率</div>
+          <div class="chart-wrap"><canvas id="chart-task-line"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🌿 习惯统计</div>
+          <div id="habit-stats-list"></div>
+        </div>
+      </section>
+
+      <!-- ========== 运动锻炼 ========== -->
+      <section class="page-view" id="view-exercise">
+        <div class="card">
+          <div class="card-title">🏃 运动记录</div>
+          <div class="ex-add-row">
+            <select id="ex-type"></select>
+            <input type="number" id="ex-duration" placeholder="时长(分钟)" min="1">
+            <input type="date" id="ex-date">
+            <input type="text" id="ex-note" placeholder="备注">
+            <button class="btn btn-primary btn-sm" onclick="Exercise.addRecord()">+</button>
+          </div>
+          <div class="ex-type-manage">
+            <button class="btn btn-secondary btn-sm" onclick="Exercise.addType()">➕ 自定义运动</button>
+          </div>
+          <div id="exercise-list" class="foldable-container"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">⚖️ 体重记录</div>
+          <div class="weight-add-row">
+            <input type="date" id="weight-date">
+            <input type="number" id="weight-input" placeholder="体重 (kg)" step="0.1" min="20" max="300">
+            <button class="btn btn-primary btn-sm" onclick="Exercise.addWeight()">+</button>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-weight-line"></canvas></div>
+          <div id="weight-stats"></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ========== 桌面互动人物 ========== -->
+  <div class="companion-widget" id="companion-widget">
+    <div class="companion-bubble hidden" id="companion-bubble"></div>
+    <img src="companion-aoi.png" alt="雾矢葵" id="companion-img" draggable="false">
+  </div>
+
+</div>
+
+<!-- ========== 弹窗 ========== -->
+<div class="modal-overlay hidden" id="modal-overlay" onclick="if(event.target===this)Modal.close()">
+  <div class="modal-content" id="modal-content"></div>
+</div>
+
+<!-- ========== Toast ========== -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="app.js?v=11"></script>
+<script>
+// 仅在浏览器环境中注册 Service Worker（Electron 桌面端不需要）
+if ('serviceWorker' in navigator && !window.process?.versions?.electron && !window.electron) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
